@@ -5,17 +5,17 @@ LIBS ?= -lpcap -lstdc++
 all: pcapsipdump
 
 pcapsipdump: pcapsipdump.cpp calltable.cpp calltable.h
-	@$(CC) $(CPPFLAGS) $(LDFLAGS) $(LIBS) $(DEFS) makefile-helpers/check_libpcap.c -o /dev/null 2>/dev/null || (\
+	@$(CXX) $(CPPFLAGS) $(LDFLAGS) $(LIBS) $(DEFS) makefile-helpers/check_libpcap.c -o /dev/null $(LIBS) 2>/dev/null || (\
 	  echo "Required library not found: pcap "; \
 	  echo "Please install it in your distribution-specific manner, e.g.:"; \
 	  echo " yum install libpcap-devel"; \
 	  echo " apt-get install libpcap-dev"; \
 	  echo " cd ~ports/net/libpcap && make install"; \
 	  false)
-	$(CC) $(CPPFLAGS) $(LDFLAGS) $(LIBS) $(DEFS) pcapsipdump.cpp calltable.cpp -o pcapsipdump
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) $(DEFS) pcapsipdump.cpp calltable.cpp -o pcapsipdump $(LIBS)
 
 pcapsipdump-debug: pcapsipdump.cpp calltable.cpp calltable.h
-	$(CC) $(CPPFLAGS) $(LDFLAGS) $(LIBS) $(DEFS) -ggdb pcapsipdump.cpp calltable.cpp -o pcapsipdump-debug
+	$(CXX) $(CPPFLAGS) $(LDFLAGS) $(DEFS) -ggdb pcapsipdump.cpp calltable.cpp -o pcapsipdump-debug  $(LIBS)
 
 clean:
 	rm -f pcapsipdump
