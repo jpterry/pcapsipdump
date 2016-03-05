@@ -62,6 +62,7 @@ int calltable::add(
     table[idx].ip_n=0;
     table[idx].last_packet_time=time;
     global_last_packet_time=time;
+    callid_to_idx[std::string(call_id, call_id_len)] = idx;
     return idx;
 }
 
@@ -70,14 +71,11 @@ int calltable::find_by_call_id(
 	unsigned long call_id_len)
 {
     int i;
-    for (i=0;i<(int)table_size;i++){
-	if ((table[i].is_used!=0)&&
-	    (table[i].call_id_len==call_id_len)&&
-	    (memcmp(table[i].call_id,call_id,MIN(call_id_len,32))==0)){
-	    return i;
-	}
+    callid_idx::iterator it = callid_to_idx.find(std::string(call_id, call_id_len));
+    if (it == callid_to_idx.end()) {
+        return -1;
     }
-    return -1;
+    return it->second;
 }
 
 int calltable::add_ip_port(
@@ -102,6 +100,7 @@ int calltable::add_ip_port(
 	table[call_idx].ip[n]=addr;
 	table[call_idx].port[n]=port;
 	table[call_idx].ip_n++;
+	rtp_to_idx[rtp_key(addr, port)] = call_idx;
     }
     return 0;
 }
@@ -112,13 +111,18 @@ int calltable::find_ip_port(
 	    unsigned short port)
 {
     int idx,i;
-    for(idx=0;idx<(int)table_size;idx++){
-	for(i=0;i<table[idx].ip_n;i++){
-	    if(table[idx].port[i]==port && table[idx].ip[i]==addr){
-		return idx;
-	    }
-	} 
+    rtp_idx::iterator it = rtp_to_idx.find(rtp_key(addr, port));
+    if (it == rtp_to_idx.end()) {
+        return -1;
     }
+    idx = it->second;
+
+    for(i=0;i<table[idx].ip_n;i++){
+        if(table[idx].port[i]==port && table[idx].ip[i]==addr){
+    	return idx;
+        }
+    } 
+
     return -1;
 }
 
@@ -131,15 +135,20 @@ int calltable::find_ip_port_ssrc(
             int *idx_rtp)
 {
     int i_leg,i_rtp;
-    for(i_leg=0;i_leg<(int)table_size;i_leg++){
-        for(i_rtp=0;i_rtp<table[i_leg].ip_n;i_rtp++){
-            if(table[i_leg].port[i_rtp]==port && table[i_leg].ip[i_rtp]==addr){
-                if (!table[i_leg].had_bye || table[i_leg].ssrc[i_rtp]==ssrc){
-                    table[i_leg].ssrc[i_rtp]=ssrc;
-                    *idx_leg=i_leg;
-                    *idx_rtp=i_rtp;
-                    return 1;
-                }
+
+    rtp_idx::iterator it = rtp_to_idx.find(rtp_key(addr, port));
+    if (it == rtp_to_idx.end()) {
+        return 0;
+    }
+    i_leg = it->second;
+
+    for(i_rtp=0;i_rtp<table[i_leg].ip_n;i_rtp++){
+        if(table[i_leg].port[i_rtp]==port && table[i_leg].ip[i_rtp]==addr){
+            if (!table[i_leg].had_bye || table[i_leg].ssrc[i_rtp]==ssrc){
+                table[i_leg].ssrc[i_rtp]=ssrc;
+                *idx_leg=i_leg;
+                *idx_rtp=i_rtp;
+                return 1;
             }
         }
     }
@@ -150,6 +159,11 @@ int calltable::do_cleanup( time_t currtime ){
     int idx;
     for(idx=0;idx<(int)table_size;idx++){
 	if(table[idx].is_used && currtime-table[idx].last_packet_time > 300){
+            for(int i_rtp=0; i_rtp<table[idx].ip_n; i_rtp++) {
+                rtp_to_idx.erase(rtp_key(table[idx].ip[i_rtp], table[idx].port[i_rtp]));
+            }
+
+            callid_to_idx.erase(std::string(table[idx].call_id, table[idx].call_id_len));
 	    if (table[idx].f_pcap!=NULL){
 		pcap_dump_close(table[idx].f_pcap);
 	    }

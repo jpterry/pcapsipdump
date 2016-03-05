@@ -21,6 +21,8 @@
 */
 
 #include <pcap.h>
+#include <map>
+#include <string>
 #include <arpa/inet.h>
 
 #define calltable_max 10240
@@ -41,6 +43,30 @@ struct calltable_element {
 	FILE *f;
 	char fn_pcap[128];
 };
+class rtp_key{
+private:
+	in_addr_t ip;
+    uint16_t port;
+public:
+    rtp_key(in_addr_t rip, uint16_t rport) {
+        ip = rip;
+        port = rport;
+    }
+
+    bool operator < (const rtp_key& rhs) const {
+        int cmp = *(unsigned int*)(&ip) - *(unsigned int*)(&(rhs.ip));
+        if (cmp < 0) {
+            return true;
+        } else if (cmp > 0){
+            return false;        
+        } else {
+            return port < rhs.port;
+        }
+    }
+};
+
+typedef std::map<rtp_key, int> rtp_idx;
+typedef std::map<std::string, int> callid_idx;
 
 class calltable
 {
@@ -72,4 +98,6 @@ class calltable
     private:
 	unsigned long table_size;
 	time_t global_last_packet_time;
+    rtp_idx rtp_to_idx;
+    callid_idx callid_to_idx;
 };
